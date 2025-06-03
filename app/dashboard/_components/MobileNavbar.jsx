@@ -35,7 +35,7 @@ const MobileNavbar = () => {
         ${open ? 'translate-x-0' : 'translate-x-full'}
       `}>
         <div className="p-5">
-          <h1 className="text-xl font-bold mb-6">App Name</h1>
+          <img src="/logo2.png" alt="App Logo" className="h-10 mb-6" />
           <nav>
             {menuItems.map(item => (
               <Link

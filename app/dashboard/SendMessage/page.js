@@ -176,8 +176,8 @@ const SendMessage = () => {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Send Notifications to Absent Students</h1>
+    <div className="p-4 sm:p-6">
+      <h1 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Send Notifications to Absent Students</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
@@ -205,25 +205,25 @@ const SendMessage = () => {
       ) : (
         <>
           <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-2">Absent Students</h2>
+            <h2 className="text-base sm:text-lg font-semibold mb-2">Absent Students</h2>
             {absentStudents.length > 0 ? (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
+              <div className="bg-white rounded-lg shadow overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Absent Days</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Absent Days</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {absentStudents.map((student) => (
                       <tr key={student.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.grade}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.absentDaysCount} days</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">{student.name}</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{student.grade}</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{student.email}</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">{student.absentDaysCount} days</td>
                       </tr>
                     ))}
                   </tbody>
@@ -231,9 +231,9 @@ const SendMessage = () => {
               </div>
             ) : (
               <div className="text-center py-8 bg-gray-50 rounded-lg">
-                <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-lg font-medium text-gray-900">No absent students found</h3>
-                <p className="mt-1 text-sm text-gray-500">
+                <AlertCircle className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
+                <h3 className="mt-2 text-base sm:text-lg font-medium text-gray-900">No absent students found</h3>
+                <p className="mt-1 text-xs sm:text-sm text-gray-500">
                   {'All students were present or no attendance data available'}
                 </p>
               </div>
@@ -241,8 +241,8 @@ const SendMessage = () => {
           </div>
           
           {absentStudents.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Compose Email</h2>
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-semibold mb-4">Compose Email</h2>
               
               {gmailList.length > 0 && (
                 <div className="mb-4">
@@ -318,10 +318,10 @@ const SendMessage = () => {
                   value={useDefaultMessage ? defaultMessage : emailBody}
                   onChange={e => setEmailBody(e.target.value)}
                   placeholder="Dear parent, we are writing to inform you about your child's absence..."
-                  className="min-h-[200px]"
+                  className="min-h-[150px] sm:min-h-[200px]"
                   disabled={useDefaultMessage}
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   You can use {'{studentName}'}, {'{absentDays}'}, and {'{month}'} as placeholders.
                 </p>
               </div>
