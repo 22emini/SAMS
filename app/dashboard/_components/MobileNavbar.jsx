@@ -34,7 +34,15 @@ const MobileNavbar = () => {
         fixed inset-0 bg-white transition-transform duration-300 md:hidden z-40
         ${open ? 'translate-x-0' : 'translate-x-full'}
       `}>
-        <div className="p-5">
+        <div className="p-5 relative">
+          {/* Close Button */}
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-slate-200 hover:bg-slate-300 focus:outline-none"
+            aria-label="Close menu"
+          >
+            <X size={24} />
+          </button>
           <img src="/logo2.png" alt="App Logo" className="h-10 mb-6" />
           <nav>
             {menuItems.map(item => (
