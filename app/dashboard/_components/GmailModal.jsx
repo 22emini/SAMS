@@ -61,16 +61,16 @@ export default function GmailComponent() {
   }
 
   return (
-    <div className="p-6 mt-20 bg-white rounded shadow max-w-md mx-auto">
-      <h2 className="text-xl font-bold mb-4">Manage Gmail Accounts</h2>
+    <div className="p-4 sm:p-6 mt-10 sm:mt-20 bg-white rounded shadow max-w-full sm:max-w-md mx-2 sm:mx-auto">
+      <h2 className="text-lg sm:text-xl font-bold mb-4 text-center">Manage Gmail Accounts</h2>
       {loading && <div>Loading...</div>}
       <ul className="mb-4">
         {gmailList.map((entry) => (
-          <li key={entry.id} className="flex items-center justify-between mb-2">
-            <span>{entry.gmail}</span>
-            <div>
-              <Button size="sm" onClick={() => handleEdit(entry)} className="mr-2">Edit</Button>
-              <Button size="sm" variant="destructive" onClick={() => handleDelete(entry.id)}>Delete</Button>
+          <li key={entry.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2 sm:gap-0">
+            <span className="break-all">{entry.gmail}</span>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button size="sm" onClick={() => handleEdit(entry)} className="w-full sm:w-auto">Edit</Button>
+              <Button size="sm" variant="destructive" onClick={() => handleDelete(entry.id)} className="w-full sm:w-auto">Delete</Button>
             </div>
           </li>
         ))}
@@ -81,6 +81,7 @@ export default function GmailComponent() {
           value={gmail}
           onChange={e => setGmail(e.target.value)}
           disabled={loading}
+          className="w-full"
         />
         <Input
           placeholder="Gmail Password"
@@ -88,13 +89,14 @@ export default function GmailComponent() {
           value={gmailPassword}
           onChange={e => setGmailPassword(e.target.value)}
           disabled={loading}
+          className="w-full"
         />
       </div>
-      <div className="flex gap-2">
-        <Button onClick={handleSave} disabled={loading || !gmail || !gmailPassword}>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button onClick={handleSave} disabled={loading || !gmail || !gmailPassword} className="w-full sm:w-auto">
           {editingId ? "Update" : "Save"}
         </Button>
-        <Button variant="secondary" onClick={resetForm} disabled={loading}>
+        <Button variant="secondary" onClick={resetForm} disabled={loading} className="w-full sm:w-auto">
           Clear
         </Button>
       </div>

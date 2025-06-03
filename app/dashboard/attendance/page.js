@@ -62,41 +62,36 @@ function Attendance() {
       }
   };
     return (
-        <div className='p-10'>
-            <h2 className='text-2xl font-bold'>Attendance</h2>
+        <div className="p-4 sm:p-10">
+            <h2 className="text-2xl font-bold mb-4">Attendance</h2>
             {/* Search option  */}
-
-            <div 
-            
-          className="flex flex-wrap gap-5 my-5 p-5 border rounded-lg shadow-sm">
-  <div className="flex flex-col sm:flex-row gap-2 items-center w-full sm:w-auto">
-    <label className="whitespace-nowrap">Select Month:</label>
-    <MonthSelection selectedMonth={(value) => setSelectedMonth(value)} />
-  </div>
-  <div className="flex flex-col sm:flex-row gap-2 items-center w-full sm:w-auto">
-    <label className="whitespace-nowrap">Select Department:</label>
-    <GradeSelect selectedGrade={(v) => setSelectedGrade(v)} />
-  </div>
-  <div className="w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-5 my-4 sm:my-5 p-4 sm:p-5 border rounded-lg shadow-sm">
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center w-full sm:w-auto">
+                    <label className="whitespace-nowrap mb-1 sm:mb-0">Select Month:</label>
+                    <MonthSelection selectedMonth={(value) => setSelectedMonth(value)} />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center w-full sm:w-auto">
+                    <label className="whitespace-nowrap mb-1 sm:mb-0">Select Department:</label>
+                    <GradeSelect selectedGrade={(v) => setSelectedGrade(v)} />
+                </div>
+                <div className="w-full sm:w-auto">
                     <Button className="w-full sm:w-auto" onClick={exportAttendanceToExcel}>
                         Export to Excel
                     </Button>
                 </div>
-  <div className="w-full sm:w-auto">
-    <Button className="w-full sm:w-auto" onClick={() => onSearchHandler()}>
-      Search
-    </Button>
-
-     <Link href="/dashboard/faceID" className="w-full bg-primary text-primary-foreground  rounded-md py-2 px-3 shadow hover:bg-primary/90 ml-1 mt-4 sm:w-auto" >
-     
-       Face ID  Attendance
-    </Link>
-  </div>
-</div>
-
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                    <Button className="w-full sm:w-auto" onClick={() => onSearchHandler()}>
+                        Search
+                    </Button>
+                    <Link href="/dashboard/faceID" className="w-full sm:w-auto bg-primary text-primary-foreground rounded-md py-2 px-3 shadow hover:bg-primary/90 mt-2 sm:mt-0 sm:ml-1 text-center">
+                        Face ID Attendance
+                    </Link>
+                </div>
+            </div>
             {/* Student Attendance Grid  */}
-            <AttendanceGrid attadanceList={attendanceList}
-            selectedMonth={selectedMonth}/>
+            <div className="overflow-x-auto">
+                <AttendanceGrid attadanceList={attendanceList} selectedMonth={selectedMonth} />
+            </div>
         </div>
     )
 }

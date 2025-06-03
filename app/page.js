@@ -374,18 +374,21 @@ export default function LandingPage() {
                   role: "Principal, Lincoln High School",
                   quote:
                     "AttendTrack has revolutionized how we monitor student attendance. We've seen a 15% improvement in attendance rates since implementation.",
+                  image: "/emily.png",
                 },
                 {
                   name: "Michael Chen",
                   role: "Teacher, Westview Middle School",
                   quote:
                     "The time I save on administrative tasks lets me focus more on teaching. The automated notifications to parents have also improved communication.",
+                  image: "/alex.png",
                 },
                 {
                   name: "Lisa Rodriguez",
                   role: "District Administrator, Oakwood Schools",
                   quote:
                     "The district-wide analytics have been invaluable for our strategic planning. We can now identify trends and address issues proactively.",
+                  image: "/michael.png",
                 },
               ].map((testimonial, index) => (
                 <motion.div
@@ -397,7 +400,7 @@ export default function LandingPage() {
                 >
                   <div className="flex items-center space-x-4">
                     <motion.div whileHover={{ rotate: 360 }} transition={{ duration: 0.5 }}>
-                      <Image src="/icon.png" alt="icon" width={30} height={30} />
+                      <Image src={testimonial.image} alt={testimonial.name} width={30} height={30} className="rounded-full object-cover" />
                     </motion.div>
                     <div>
                       <p className="font-medium">{testimonial.name}</p>

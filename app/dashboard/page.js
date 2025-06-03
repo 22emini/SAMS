@@ -80,10 +80,10 @@ function Dashboard() {
 
     const { isSignedIn, user, isLoaded } = useUser()
   return (
-    <div className='p-10'>
-      <div className='flex items-center justify-between'>
-          <h2 className='font-bold text-2xl'>Dashboard</h2>
-          <div className='flex items-center  ml-3 gap-4'>
+    <div className='p-3 md:p-10'>
+      <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
+          <h2 className='font-bold text-xl md:text-2xl'>Dashboard</h2>
+          <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto'>
             <MonthSelection selectedMonth={setSelectedMonth} />
             <GradeSelect selectedGrade={(v)=>{setSelectedGrade(v);console.log(v)}}/>
           </div>
@@ -93,9 +93,9 @@ function Dashboard() {
           initial ={{opacity: 0, scale: 0}}
           whileInView={{opacity: 1, scale: 1}}
           transition={{duration: 2, type:'spring'}}
-          className='  text-white  bg-primary border  rounded-xl m-5 p-12'>
+          className='text-white bg-primary border rounded-xl my-5 p-4 md:p-12 text-sm md:text-base'>
           {`Welcome  back ${user.firstName} to the Student Attendance Monitoring System!
-\nWe’re excited to have you on board! This platform is designed to make tracking and managing attendance effortless and efficient.please select the month you wish to find attendace .`}
+We’re excited to have you on board! This platform is designed to make tracking and managing attendance effortless and efficient.please select the month you wish to find attendace .`}
         </motion.p>
       )}
         <StatusList attendaceList={attendaceList} />
