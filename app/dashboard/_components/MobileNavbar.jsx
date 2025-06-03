@@ -12,7 +12,7 @@ const menuItems = [
   { id: 4, name: 'Message', icon: MessageCircle, path: '/dashboard/SendMessage' },
   { id: 5, name: 'Profile', icon: Laugh, path: '/dashboard/profile' },
   { id: 6, name: 'Settings', icon: Settings, path: '/dashboard/settings' },
-  { id: 7, name: 'Face ID', icon: ScanFace, path: '/dashboard/faceID' },
+ 
 ];
 
 const MobileNavbar = () => {
@@ -88,7 +88,7 @@ const MobileNavbar = () => {
               ))}
             </nav>
           </div>
-          <div className="w-full flex justify-between items-center px-5 mt-4 pt-4 border-t absolute bottom-0 left-0">
+          <div className="w-full flex justify-between items-center px-5 mt-4 pt-4 border-t absolute bottom-10 left-0">
             <UserButton />
             <ModeToggle />
           </div>
