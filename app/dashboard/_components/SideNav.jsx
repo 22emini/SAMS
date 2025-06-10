@@ -1,7 +1,8 @@
 "use client"
-import { UserButton } from '@clerk/nextjs'
+import { Button } from '@/components/ui/button'
+import { SignOutButton, UserButton } from '@clerk/nextjs'
 
-import { GraduationCap, Hand, LayoutIcon, MessageCircle , Settings, ScanFace, Laugh } from 'lucide-react'
+import { GraduationCap, Hand, LayoutIcon, LogOutIcon, MessageCircle , Settings,  UserCircle } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -39,7 +40,7 @@ function SideNav() {
        {
       id:5,
       name:'Profile',
-      icon:Laugh,
+      icon:UserCircle,
       path:'/dashboard/profile'
     },
     {
@@ -87,7 +88,12 @@ function SideNav() {
  
       <div className='flex gap-2 items-center bottom-1 fixed p-2'>
 
-        <UserButton/>
+   <SignOutButton>
+    <Button>
+      <LogOutIcon/>
+      <span>Logout</span>
+    </Button>
+   </SignOutButton>
         
       </div>
 

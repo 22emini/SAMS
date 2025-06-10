@@ -82,7 +82,7 @@ export default function LandingPage() {
             </motion.div>
           </nav>
           <div className="flex items-center gap-4">
-            <ModeToggle />
+           
             <SignedIn>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link

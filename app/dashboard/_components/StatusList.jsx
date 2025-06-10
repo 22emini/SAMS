@@ -16,8 +16,12 @@ function StatusList({attendaceList}) {
                 setTotalStudent(totalSt.length);
 
                 const today=moment().format('D');
-                const PresentPrec=(attendaceList.length/(totalSt.length*Number(today))*100);
-                setPresentPerc(PresentPrec)
+                if (attendaceList && totalSt.length > 0 && Number(today) > 0) {
+                    const PresentPrec = (attendaceList.length / (totalSt.length * Number(today)) * 100);
+                    setPresentPerc(PresentPrec);
+                } else {
+                    setPresentPerc(0);
+                }
         }
     },[attendaceList])
   return (

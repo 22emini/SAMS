@@ -16,7 +16,7 @@ function Header() {
         {/* You can add a logo or title here if needed */}
       </div>
       <div className=''>
-        <ModeToggle />
+        <UserButton />
       </div>
     </div>
   )

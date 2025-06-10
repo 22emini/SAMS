@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Home, User, Settings, GraduationCap, Hand, MessageCircle, LayoutIcon, Laugh, ScanFace } from 'lucide-react';
+import { Menu, X, Home, User, Settings, GraduationCap, Hand, MessageCircle, LayoutIcon, Laugh, ScanFace, LogOutIcon, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
-import ModeToggle from '@/components/ui/Toogle';
+import { SignOutButton, UserButton } from '@clerk/nextjs';
+import { Button } from '@/components/ui/button';
+
 
 const menuItems = [
   { id: 1, name: 'Dashboard', icon: LayoutIcon, path: '/dashboard' },
   { id: 2, name: 'Students', icon: GraduationCap, path: '/dashboard/students' },
   { id: 3, name: 'Attendance', icon: Hand, path: '/dashboard/attendance' },
   { id: 4, name: 'Message', icon: MessageCircle, path: '/dashboard/SendMessage' },
-  { id: 5, name: 'Profile', icon: Laugh, path: '/dashboard/profile' },
+  { id: 5, name: 'Profile', icon: UserCircle, path: '/dashboard/profile' },
   { id: 6, name: 'Settings', icon: Settings, path: '/dashboard/settings' },
  
 ];
@@ -90,7 +91,12 @@ const MobileNavbar = () => {
           </div>
           <div className="w-full flex justify-between items-center px-5 mt-4 pt-4 border-t absolute bottom-10 left-0">
             <UserButton />
-            <ModeToggle />
+            <SignOutButton>
+    <Button>
+      <LogOutIcon/>
+      <span>Logout</span>
+    </Button>
+   </SignOutButton>
           </div>
         </div>
       </div>
