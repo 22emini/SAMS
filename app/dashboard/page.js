@@ -94,7 +94,7 @@ function Dashboard() {
           whileInView={{opacity: 1, scale: 1}}
           transition={{duration: 2, type:'spring'}}
           className='text-white bg-primary border rounded-xl my-5 p-4 md:p-12 text-sm md:text-base'>
-          {`Welcome  back ${user.firstName} to the Student Attendance Monitoring System!
+          {`Welcome  back, ${user.firstName} 👋 to the Student Attendance Monitoring System!
 We’re excited to have you on board! This platform is designed to make tracking and managing attendance effortless and efficient.please select the month you wish to find attendace .`}
         </motion.p>
       )}
