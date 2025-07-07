@@ -17,6 +17,8 @@ function Attendance() {
     const [selectedMonth,setSelectedMonth]=useState();
     const [selectedGrade,setSelectedGrade]=useState('5th');
     const [attendanceList,setAttendceList]=useState();
+    const [selectedDay, setSelectedDay] = useState(1);
+    const [loading, setLoading] = useState(false);
 
     /**
      * Used to fetch attendance list for give month and Grade
@@ -61,6 +63,43 @@ function Attendance() {
           console.error("Error exporting to Excel:", error);
       }
   };
+
+    const handleMarkAll = async () => {
+      if (!attendanceList || attendanceList.length === 0) {
+        toast.error("No attendance data to mark.");
+        return;
+      }
+      setLoading(true);
+      const date = moment(selectedMonth).format('MM/YYYY');
+      const promises = attendanceList.map(student =>
+        GlobalApi.MarkAttendance({
+          day: selectedDay,
+          studentId: student.studentId,
+          present: true,
+          date,
+        })
+      );
+      await Promise.all(promises);
+      toast.success("All students marked as present for day " + selectedDay);
+      setLoading(false);
+      onSearchHandler(); // Refresh grid
+    };
+
+    const handleUnmarkAll = async () => {
+      if (!attendanceList || attendanceList.length === 0) {
+        toast.error("No attendance data to unmark.");
+        return;
+      }
+      setLoading(true);
+      const date = moment(selectedMonth).format('MM/YYYY');
+      const promises = attendanceList.map(student =>
+        GlobalApi.MarkAbsent(student.studentId, selectedDay, date)
+      );
+      await Promise.all(promises);
+      toast.success("All students marked as absent for day " + selectedDay);
+      setLoading(false);
+      onSearchHandler(); // Refresh grid
+    };
     return (
         <div className="p-4 sm:p-10">
             <h2 className="text-2xl font-bold mb-4">Attendance</h2>
@@ -87,6 +126,36 @@ function Attendance() {
                         Face ID Attendance
                     </Link>
                 </div>
+            </div>
+            {/* Mark All/Unmark All Controls - always visible after search controls */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center mb-4 w-full">
+              <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 w-full sm:w-auto">
+                <label className="mb-1 sm:mb-0">Select Day:</label>
+                <select
+                  value={selectedDay}
+                  onChange={e => setSelectedDay(Number(e.target.value))}
+                  className="border rounded px-2 py-1 w-full sm:w-auto"
+                  disabled={!selectedMonth || loading}
+                >
+                  {selectedMonth ? (
+                    Array.from({ length: moment(selectedMonth).daysInMonth() }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">Select Month First</option>
+                  )}
+                </select>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button onClick={handleMarkAll} disabled={!selectedMonth || loading} className="w-full sm:w-auto">
+                  {loading ? 'Marking...' : 'Mark All Present'}
+                </Button>
+                <Button onClick={handleUnmarkAll} disabled={!selectedMonth || loading} variant="destructive" className="w-full sm:w-auto">
+                  {loading ? 'Unmarking...' : 'Unmark All (Absent)'}
+                </Button>
+              </div>
             </div>
             {/* Student Attendance Grid  */}
             <div className="overflow-x-auto">
