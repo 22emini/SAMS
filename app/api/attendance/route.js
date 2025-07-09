@@ -2,16 +2,9 @@ import { db } from "@/utils";
 import { ATTENDACE, STUDENTS } from "@/utils/schema";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { auth } from '@clerk/nextjs/server';
 
 export async function GET(req) {
     try {
-        const { userId } = await auth();
-        
-        if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
         const searchParams = req.nextUrl.searchParams;
         const grade = searchParams.get('grade');
         const month = searchParams.get('month');
@@ -36,10 +29,7 @@ export async function GET(req) {
                 and(eq(STUDENTS.id, ATTENDACE.studentId), eq(ATTENDACE.date, month))
             )
             .where(
-                and(
-                    eq(STUDENTS.grade, grade),
-                    eq(STUDENTS.clerkUserId, userId)
-                )
+                eq(STUDENTS.grade, grade)
             )
             .orderBy(asc(STUDENTS.id));
 
@@ -52,29 +42,7 @@ export async function GET(req) {
 
 export async function POST(req) {
     try {
-        const { userId } = await auth();
-        
-        if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
         const data = await req.json();
-        
-        // Verify that the student belongs to the current user
-        const student = await db
-            .select()
-            .from(STUDENTS)
-            .where(
-                and(
-                    eq(STUDENTS.id, data.studentId),
-                    eq(STUDENTS.clerkUserId, userId)
-                )
-            )
-            .limit(1);
-
-        if (!student || student.length === 0) {
-            return NextResponse.json({ error: "Student not found or unauthorized" }, { status: 403 });
-        }
 
         const result = await db.insert(ATTENDACE).values({
             studentId: data.studentId,

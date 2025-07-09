@@ -3,10 +3,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import * as faceapi from '@vladmandic/face-api'
 import * as tf from '@tensorflow/tfjs'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import GlobalApi from '@/app/_services/GlobalApi'
-import GradeSelect from '@/app/_components/GradeSelect'
 
 const PROMPTS = [
   'Look straight at the camera',
@@ -17,9 +16,11 @@ const PROMPTS = [
 const FaceRegistration = () => {
   const [isModelLoading, setIsModelLoading] = useState(true)
   const [stream, setStream] = useState(null)
-  const [selectedGrade, setSelectedGrade] = useState('')
-  const [students, setStudents] = useState([])
-  const [selectedStudent, setSelectedStudent] = useState('')
+  const searchParams = useSearchParams()
+  const email = searchParams.get('email') || ''
+  const lecturerEmail = searchParams.get('lecturerEmail') || ''
+  const grade = searchParams.get('grade') || ''
+  const [student, setStudent] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [currentPrompt, setCurrentPrompt] = useState('')
   const [step, setStep] = useState(0)
@@ -52,11 +53,36 @@ const FaceRegistration = () => {
     // eslint-disable-next-line
   }, [])
 
-  // Load students when grade changes
+  // Find student by email, lecturerEmail, and grade
   useEffect(() => {
-    if (selectedGrade) loadStudents();
-    else setStudents([]);
-  }, [selectedGrade])
+    const fetchStudent = async () => {
+      if (email && lecturerEmail && grade) {
+        try {
+          // Get lecturer's clerkUserId
+          const lecturerResp = await GlobalApi.VerifyLecturerEmail(lecturerEmail.trim())
+          if (!lecturerResp.data || !lecturerResp.data.clerkUserId) {
+            toast.error('Lecturer not found')
+            return
+          }
+          const clerkUserId = lecturerResp.data.clerkUserId
+          // Get student by email, lecturer and grade
+          const resp = await GlobalApi.GetStudentsByLecturerAndGrade({
+            email: email.trim(),
+            clerkUserId,
+            grade: grade.trim(),
+          })
+          if (resp.data && Array.isArray(resp.data) && resp.data.length > 0) {
+            setStudent(resp.data[0])
+          } else {
+            toast.error('Student not found for this lecturer and grade')
+          }
+        } catch (err) {
+          toast.error('Failed to load student')
+        }
+      }
+    }
+    fetchStudent()
+  }, [email, lecturerEmail, grade])
 
   // Draw bounding box overlay
   const drawBox = (detection) => {
@@ -135,59 +161,59 @@ const FaceRegistration = () => {
 
   // Step-by-step face capture with improved accuracy
   const handleRegister = async () => {
-    if (!videoRef.current || isModelLoading || !selectedStudent) {
-      toast.error('Please select a student and ensure camera is ready');
-      return;
+    if (!videoRef.current || isModelLoading || !student) {
+      toast.error('Student not found or camera not ready')
+      return
     }
-    setProcessing(true);
-    setDescriptors([]);
-    const SAMPLES_PER_PROMPT = 3;
-    const MIN_CONFIDENCE = 0.7;
-    let allDescriptors = [];
+    setProcessing(true)
+    setDescriptors([])
+    const SAMPLES_PER_PROMPT = 3
+    const MIN_CONFIDENCE = 0.7
+    let allDescriptors = []
     for (let i = 0; i < PROMPTS.length; i++) {
-      setCurrentPrompt(PROMPTS[i]);
-      setStep(i + 1);
-      let promptDescriptors = [];
-      let attempts = 0;
+      setCurrentPrompt(PROMPTS[i])
+      setStep(i + 1)
+      let promptDescriptors = []
+      let attempts = 0
       while (promptDescriptors.length < SAMPLES_PER_PROMPT && attempts < SAMPLES_PER_PROMPT * 4) {
-        await new Promise(res => setTimeout(res, 500));
+        await new Promise(res => setTimeout(res, 500))
         const detection = await faceapi.detectSingleFace(
           videoRef.current,
           new faceapi.SsdMobilenetv1Options({ minConfidence: MIN_CONFIDENCE })
-        ).withFaceLandmarks(faceapi.nets.faceLandmark68Net).withFaceDescriptor();
+        ).withFaceLandmarks(faceapi.nets.faceLandmark68Net).withFaceDescriptor()
         if (detection && detection.detection && detection.detection.score > MIN_CONFIDENCE) {
-          promptDescriptors.push(Array.from(detection.descriptor));
+          promptDescriptors.push(Array.from(detection.descriptor))
         }
-        attempts++;
+        attempts++
       }
       if (promptDescriptors.length === 0) {
-        toast.error('No clear face detected. Please try again.');
-        setProcessing(false);
-        setCurrentPrompt('');
-        setStep(0);
-        return;
+        toast.error('No clear face detected. Please try again.')
+        setProcessing(false)
+        setCurrentPrompt('')
+        setStep(0)
+        return
       }
-      allDescriptors = allDescriptors.concat(promptDescriptors);
+      allDescriptors = allDescriptors.concat(promptDescriptors)
     }
-    setCurrentPrompt('');
-    setStep(0);
+    setCurrentPrompt('')
+    setStep(0)
     // Register face
     try {
-      const avgDescriptor = averageDescriptors(allDescriptors);
-      // Validation before sending
-      if (!selectedStudent || !avgDescriptor || avgDescriptor.length !== 128) {
-        toast.error('Face capture failed. Please try again.');
-        setProcessing(false);
-        return;
+      const avgDescriptor = averageDescriptors(allDescriptors)
+      if (!student.id || !avgDescriptor || avgDescriptor.length !== 128) {
+        toast.error('Face capture failed. Please try again.')
+        setProcessing(false)
+        return
       }
-      await GlobalApi.RegisterFaceId(selectedStudent, avgDescriptor);
-      toast.success('Face ID registered successfully!');
-      router.push('/dashboard/faceID');
+      await GlobalApi.RegisterFaceId(student.id, avgDescriptor)
+      toast.success('Face ID registered successfully!')
+      // Redirect back to face recognition with params
+      router.push(`/attendee/take-attendance/faceID?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)
     } catch (error) {
-      toast.error('Error during face registration');
+      toast.error('Error during face registration')
     } finally {
-      setProcessing(false);
-      setDescriptors([]);
+      setProcessing(false)
+      setDescriptors([])
     }
   }
 
@@ -199,30 +225,22 @@ const FaceRegistration = () => {
         <div className="flex flex-col md:flex-row gap-8 items-start">
           <div className="flex-1 space-y-4">
             <div>
-              <label className="block text-sm font-semibold mb-1">Select Grade</label>
-              <GradeSelect selectedGrade={setSelectedGrade} />
+              <label className="block text-sm font-semibold mb-1">Grade</label>
+              <input type="text" value={grade} disabled className="w-full p-2 border rounded-md bg-gray-100" />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1">Select Student</label>
-              <select
-                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-400"
-                value={selectedStudent}
-                onChange={e => setSelectedStudent(e.target.value)}
-                disabled={!selectedGrade || processing}
-              >
-                <option value="">Select a student</option>
-                {students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold mb-1">Student Email</label>
+              <input type="email" value={email} disabled className="w-full p-2 border rounded-md bg-gray-100" />
             </div>
-            {selectedStudent && (
+            <div>
+              <label className="block text-sm font-semibold mb-1">Lecturer Email</label>
+              <input type="email" value={lecturerEmail} disabled className="w-full p-2 border rounded-md bg-gray-100" />
+            </div>
+            {student && (
               <div className="mt-4 p-3 bg-blue-50 rounded-md border flex flex-col gap-1">
-                <span className="font-medium text-blue-700">Selected Student:</span>
-                <span className="text-gray-700">{students.find(s => s.id === selectedStudent)?.name}</span>
-                <span className="text-xs text-gray-500">Grade: {selectedGrade}</span>
+                <span className="font-medium text-blue-700">Student:</span>
+                <span className="text-gray-700">{student.name}</span>
+                <span className="text-xs text-gray-500">Grade: {grade}</span>
               </div>
             )}
           </div>
@@ -265,7 +283,7 @@ const FaceRegistration = () => {
         <div className="flex gap-4 justify-center mt-8">
           <Button
             onClick={handleRegister}
-            disabled={processing || !selectedStudent}
+            disabled={processing || !student}
             className="flex items-center gap-2 px-6 py-2 text-lg"
           >
             {processing ? (
@@ -277,7 +295,7 @@ const FaceRegistration = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push('/dashboard/faceID')}
+            onClick={() => router.push(`/attendee/take-attendance/faceID?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)}
             disabled={processing}
           >
             Cancel

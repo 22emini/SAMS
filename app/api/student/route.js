@@ -6,19 +6,12 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function POST(req) {
     try {
-        const { userId } = await auth();
-        
-        if (!userId) {
-            console.log('Unauthorized: No user ID found');
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
         const data = await req.json();
         console.log('Received data:', data);
 
-        if (!data.name || !data.grade) {
-            console.log('Validation failed:', { name: data.name, grade: data.grade });
-            return NextResponse.json({ error: "Name and grade are required" }, { status: 400 });
+        if (!data.name || !data.grade || !data.clerkUserId) {
+            console.log('Validation failed:', { name: data.name, grade: data.grade, clerkUserId: data.clerkUserId });
+            return NextResponse.json({ error: "Name, grade, and clerkUserId are required" }, { status: 400 });
         }
 
         // Prepare the data to be inserted
@@ -28,9 +21,20 @@ export async function POST(req) {
             address: data.address ? data.address.trim() : null,
             contact: data.contact ? data.contact.trim() : null,
             email: data.email ? data.email.trim() : null,
-            clerkUserId: userId
+            clerkUserId: data.clerkUserId.trim()
         };
         console.log('Attempting to insert student:', studentData);
+
+        // Check for duplicate email (case-insensitive)
+        if (studentData.email) {
+            const existing = await db
+                .select()
+                .from(STUDENTS)
+                .where(eq(STUDENTS.email, studentData.email.toLowerCase()));
+            if (existing.length > 0) {
+                return NextResponse.json({ error: "A student with this email already exists." }, { status: 409 });
+            }
+        }
 
         try {
             const result = await db.insert(STUDENTS).values(studentData);
@@ -40,7 +44,7 @@ export async function POST(req) {
             const createdStudent = await db
                 .select()
                 .from(STUDENTS)
-                .where(eq(STUDENTS.clerkUserId, userId))
+                .where(eq(STUDENTS.clerkUserId, data.clerkUserId.trim()))
                 .orderBy(desc(STUDENTS.id))
                 .limit(1);
 
@@ -65,24 +69,32 @@ export async function POST(req) {
 
 export async function GET(req) {
     try {
+        const searchParams = req.nextUrl.searchParams;
+        const grade = searchParams.get('grade');
+        const clerkUserId = searchParams.get('clerkUserId');
+        const email = searchParams.get('email');
+
+        // Public lookup for attendance: allow if all three are present
+        if (clerkUserId && grade && email) {
+            const result = await db.select().from(STUDENTS)
+                .where(eq(STUDENTS.clerkUserId, clerkUserId))
+                .where(eq(STUDENTS.grade, grade))
+                .where(eq(STUDENTS.email, email));
+            return NextResponse.json(result);
+        }
+
+        // Otherwise, require authentication (for dashboard etc)
         const { userId } = await auth();
-        
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const searchParams = req.nextUrl.searchParams;
-        const grade = searchParams.get('grade');
-
         let query = db.select().from(STUDENTS);
-        
         if (grade) {
             query = query.where(eq(STUDENTS.grade, grade));
         }
-
         // Only return students associated with the current user
         query = query.where(eq(STUDENTS.clerkUserId, userId));
-
         const result = await query;
         return NextResponse.json(result);
     } catch (error) {

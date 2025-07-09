@@ -3,69 +3,101 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import * as faceapi from '@vladmandic/face-api'
 import * as tf from '@tensorflow/tfjs'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import GlobalApi from '@/app/_services/GlobalApi'
-import GradeSelect from '@/app/_components/GradeSelect'
+
+import { useAuth } from "@clerk/nextjs";
 import moment from 'moment'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
+// Student fetching logic
+const fetchStudentByEmailLecturerGrade = async (email, lecturerEmail, grade) => {
+  try {
+    // Get lecturer's clerkUserId
+    const lecturerResp = await GlobalApi.VerifyLecturerEmail(lecturerEmail.trim())
+    if (!lecturerResp.data || !lecturerResp.data.clerkUserId) {
+      return null
+    }
+    const clerkUserId = lecturerResp.data.clerkUserId
+    // Get student by email, lecturer and grade
+    const resp = await GlobalApi.GetStudentsByLecturerAndGrade({
+      email: email.trim(),
+      clerkUserId,
+      grade: grade.trim(),
+    })
+    if (resp.data && Array.isArray(resp.data) && resp.data.length > 0) {
+      return resp.data[0]
+    }
+    return null
+  } catch (err) {
+    return null
+  }
+}
+
+
 const FaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState(true)
   const [stream, setStream] = useState(null)
-  const [selectedGrade, setSelectedGrade] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [student, setStudent] = useState(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
-  const toastCountRef = useRef(0); // Track model toast count
-  const cameraToastCountRef = useRef(0); // Track camera toast count
+  const toastCountRef = useRef(0)
+  const cameraToastCountRef = useRef(0)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Get params from URL (from Take Attendance page)
+  const email = searchParams.get('email') || ''
+  const lecturerEmail = searchParams.get('lecturerEmail') || ''
+  const grade = searchParams.get('grade') || ''
+
+  // Fetch student info on mount
+  useEffect(() => {
+    const fetchStudent = async () => {
+      if (email && lecturerEmail && grade) {
+        const s = await fetchStudentByEmailLecturerGrade(email, lecturerEmail, grade)
+        setStudent(s)
+      }
+    }
+    fetchStudent()
+  }, [email, lecturerEmail, grade])
 
   useEffect(() => {
-    let mounted = true;
-
+    let mounted = true
     const init = async () => {
       try {
-        // Ensure TensorFlow.js is properly initialized first
-        await tf.ready();
-        
-        // Set backend to WebGL for better performance
+        await tf.ready()
         if (!tf.getBackend() || tf.getBackend() !== 'webgl') {
-          await tf.setBackend('webgl');
+          await tf.setBackend('webgl')
         }
-        
-        console.log('TensorFlow.js initialized with backend:', tf.getBackend());
-
-        // Load face-api models sequentially
-        await loadModels();
-        
+        await loadModels()
         if (mounted) {
-          await startVideo();
-          setIsModelLoading(false);
+          await startVideo()
+          setIsModelLoading(false)
         }
       } catch (error) {
-        console.error('Error initializing:', error);
+        console.error('Error initializing:', error)
         if (mounted) {
-          toast.error('Error initializing face recognition system');
-          setIsModelLoading(false);
+          toast.error('Error initializing face recognition system')
+          setIsModelLoading(false)
         }
       }
     }
-
-    init();
-
+    init()
     return () => {
-      mounted = false;
+      mounted = false
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => track.stop())
       }
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d')
         ctx && ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
       }
     }
-  }, [stream]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream])
 
   const loadModels = async () => {
     try {
@@ -140,9 +172,11 @@ const FaceRecognition = () => {
     ctx.fillText(`Conf: ${(detection.detection.score * 100).toFixed(1)}%`, resized.detection.box.x, resized.detection.box.y - 10)
   }
 
+  const { getToken } = useAuth();
+
   const handleAttendance = async () => {
-    if (!videoRef.current || isModelLoading || !selectedGrade) {
-      toast.error('Please select a grade and ensure camera is ready')
+    if (!videoRef.current || isModelLoading || !email || !lecturerEmail || !grade) {
+      toast.error('Missing required information or camera not ready')
       return
     }
     setProcessing(true)
@@ -157,7 +191,7 @@ const FaceRecognition = () => {
           videoRef.current.onloadeddata = () => resolve()
         })
       }
-      // Improved: Capture multiple frames and average descriptors
+      // Capture multiple frames and average descriptors
       const descriptors = []
       let attempts = 0
       let detections = null
@@ -167,7 +201,7 @@ const FaceRecognition = () => {
         detections = await faceapi.detectSingleFace(
           videoRef.current,
           new faceapi.SsdMobilenetv1Options({
-            minConfidence: 0.4 // Increased confidence threshold from 0.6 to 0.7
+            minConfidence: 0.4
           })
         ).withFaceLandmarks('net').withFaceDescriptor()
         if (detections && detections.descriptor) {
@@ -185,25 +219,26 @@ const FaceRecognition = () => {
       const avgDescriptor = descriptors[0].map((_, i) =>
         descriptors.reduce((sum, desc) => sum + desc[i], 0) / descriptors.length
       )
-      // Try to match face and mark attendance
+      // Try to match face and mark attendance (no authentication)
       const response = await GlobalApi.MarkAttendanceWithFace(
         Array.from(avgDescriptor),
-        selectedGrade
+        grade
       )
       if (response.data.matched && response.data.student) {
-        // Mark attendance
+        // Mark attendance (remove authorization for this request)
         const today = new Date()
         await GlobalApi.MarkAttendance({
           studentId: response.data.student.id,
           present: true,
           day: today.getDate(),
-          date: moment(today).format('MM/YYYY')
+          date: moment(today).format('MM/YYYY'),
+          noAuth: true // <-- add this flag to signal no auth required
         })
         toast.success(`Attendance marked for ${response.data.student.name}`)
       } else {
         toast.error(response.data.message || 'Face not recognized')
-        if (confirm('Would you like to register your face ID?')) {
-          router.push('/dashboard/faceID/register')
+        if (window.confirm('Face not recognized. Would you like to register your face ID?')) {
+          router.push(`/attendee/take-attendance/faceID/register?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)
         }
       }
     } catch (error) {
@@ -228,17 +263,46 @@ const FaceRecognition = () => {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Face Recognition Attendance</h1>
-      <Link href="/dashboard" className=''>
-     
+      <Link href="/" className=''>
         <Button className="w-full sm:w-auto" >
            <ArrowLeft  className=' text-white'/>  back
-          </Button>
+        </Button>
       </Link>
       <div className="flex flex-col items-center gap-4">
         <div className="w-full max-w-md mb-4">
-          <label className="block text-sm font-medium mb-1">Select Grade</label>
-          <GradeSelect selectedGrade={(grade) => setSelectedGrade(grade)} />
+          <label className="block text-sm font-medium mb-1">Grade</label>
+          <input
+            type="text"
+            value={grade}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+          />
         </div>
+        <div className="w-full max-w-md mb-4">
+          <label className="block text-sm font-medium mb-1">Student Email</label>
+          <input
+            type="email"
+            value={email}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+          />
+        </div>
+        <div className="w-full max-w-md mb-4">
+          <label className="block text-sm font-medium mb-1">Lecturer Email</label>
+          <input
+            type="email"
+            value={lecturerEmail}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+          />
+        </div>
+        {student && (
+          <div className="mt-2 p-3 bg-blue-50 rounded-md border flex flex-col gap-1 w-full max-w-md">
+            <span className="font-medium text-blue-700">Student:</span>
+            <span className="text-gray-700">{student.name}</span>
+            <span className="text-xs text-gray-500">Grade: {grade}</span>
+          </div>
+        )}
         <div className="relative border rounded-lg overflow-hidden">
           <video
             ref={videoRef}
@@ -259,7 +323,7 @@ const FaceRecognition = () => {
         <div className="flex gap-4">
           <Button 
             onClick={handleAttendance}
-            disabled={processing || !selectedGrade}
+            disabled={processing}
             className="flex items-center gap-2">
             {processing ? (
               <>
@@ -270,7 +334,7 @@ const FaceRecognition = () => {
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => router.push('/dashboard/faceID/register')}>
+            onClick={() => router.push(`/attendee/take-attendance/faceID/register?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)}>
             Register Face ID
           </Button>
         </div>

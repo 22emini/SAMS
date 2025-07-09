@@ -6,12 +6,6 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function POST(req) {
     try {
-        const { userId } = await auth();
-        
-        if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
         const { faceDescriptor, grade } = await req.json();
 
         if (!faceDescriptor || !grade) {
@@ -25,12 +19,7 @@ export async function POST(req) {
         const students = await db
             .select()
             .from(STUDENTS)
-            .where(
-                and(
-                    eq(STUDENTS.grade, grade),
-                    eq(STUDENTS.clerkUserId, userId)
-                )
-            );
+            .where(eq(STUDENTS.grade, grade));
 
         let bestMatch = null;
         let minDistance = Number.MAX_VALUE;

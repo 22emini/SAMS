@@ -7,12 +7,39 @@ import { auth } from '@clerk/nextjs/server';
 // GET all grades
 export async function GET(req) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Support filtering by lecturerEmail query param
+    const searchParams = req.nextUrl?.searchParams || req.url ? new URL(req.url, 'http://localhost').searchParams : undefined;
+    const lecturerEmail = searchParams?.get('lecturerEmail');
+
+    let result;
+    if (lecturerEmail) {
+      // Query USERGMAIL table for clerkUserId
+      const { USERGMAIL } = await import("@/utils/schema");
+      const { eq } = await import("drizzle-orm");
+      const lecturer = await db
+        .select({ clerkUserId: USERGMAIL.clerkUserId })
+        .from(USERGMAIL)
+        .where(eq(USERGMAIL.gmail, lecturerEmail))
+        .limit(1);
+      const clerkUserId = lecturer[0]?.clerkUserId;
+      if (clerkUserId) {
+        result = await db.select().from(GRADES).where(eq(GRADES.clerkUserId, clerkUserId));
+      } else {
+        result = [];
+      }
+    } else {
+      // Fallback to previous logic
+      let userId = null;
+      try {
+        const authResult = await auth();
+        userId = authResult?.userId;
+      } catch (e) {}
+      if (userId) {
+        result = await db.select().from(GRADES).where(eq(GRADES.clerkUserId, userId));
+      } else {
+        result = await db.select().from(GRADES);
+      }
     }
-    // Only return grades associated with the current user
-    const result = await db.select().from(GRADES).where(eq(GRADES.clerkUserId, userId));
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching grades:", error);

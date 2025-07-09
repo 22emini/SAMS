@@ -122,9 +122,7 @@ function Attendance() {
                     <Button className="w-full sm:w-auto" onClick={() => onSearchHandler()}>
                         Search
                     </Button>
-                    <Link href="/dashboard/faceID" className="w-full sm:w-auto bg-primary text-primary-foreground rounded-md py-2 px-3 shadow hover:bg-primary/90 mt-2 sm:mt-0 sm:ml-1 text-center">
-                        Face ID Attendance
-                    </Link>
+                    
                 </div>
             </div>
             {/* Mark All/Unmark All Controls - always visible after search controls */}
