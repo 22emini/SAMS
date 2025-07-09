@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import GroupsModal from "../_components/GroupsModal";
 import StudentList from "../_components/StudentList";
-import { Pencil } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import GmailModal from "../_components/GmailModal";
 
 
@@ -57,7 +57,7 @@ const GradesPage = () => {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-700"></div>
+          <Loader2 className="animate-spin  h-12 w-12  text-blue-700"></Loader2>
         </div>
       ) : (
         <ul className="mt-4">
@@ -87,6 +87,7 @@ const GradesPage = () => {
           handleEditGroup={handleEditGrade}
           handleDeleteGroup={handleDeleteGrade}
           group={selectedGrade}
+          existingGrades={grades.map(g => g.grade)}
         />
       )}
       <GmailModal />

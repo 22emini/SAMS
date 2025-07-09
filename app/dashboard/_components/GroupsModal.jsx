@@ -1,12 +1,17 @@
 'use client'
 import React, { useState } from "react";
 import { toast } from "sonner"
-const GroupsModal = ({ onClose, handleAddGroup, handleEditGroup, handleDeleteGroup, group }) => {
+const GroupsModal = ({ onClose, handleAddGroup, handleEditGroup, handleDeleteGroup, group, existingGrades = [] }) => {
   const [groupName, setGroupName] = useState(group ? group.grade : "");
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Frontend duplicate check (case-insensitive)
+    if (!group && existingGrades.some(g => g.toLowerCase() === groupName.trim().toLowerCase())) {
+      toast.error("Grade already exists");
+      return;
+    }
     if (group) {
       // Edit existing grade
       const response = await fetch('/api/grade', {
@@ -30,6 +35,10 @@ const GroupsModal = ({ onClose, handleAddGroup, handleEditGroup, handleDeleteGro
         body: JSON.stringify({ grade: groupName }),
       });
       const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to add grade');
+        return;
+      }
       // Create a new grade object with the response data or use a temporary ID if needed
       const newGrade = { id: data.id || Date.now(), grade: groupName };
       handleAddGroup(newGrade);

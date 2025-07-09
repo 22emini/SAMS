@@ -31,6 +31,13 @@ export async function POST(req) {
     if (!grade) {
       return NextResponse.json({ error: "Grade is required" }, { status: 400 });
     }
+    // Check for duplicate grade (case-insensitive) for this user
+    const existing = await db.select().from(GRADES)
+      .where(eq(GRADES.clerkUserId, userId));
+    const duplicate = existing.find(g => g.grade.toLowerCase() === grade.toLowerCase());
+    if (duplicate) {
+      return NextResponse.json({ error: "Grade already exists" }, { status: 409 });
+    }
     try {
       // Insert the new grade with clerkUserId
       const result = await db.insert(GRADES).values({ grade, clerkUserId: userId });
