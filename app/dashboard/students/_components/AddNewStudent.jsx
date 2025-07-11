@@ -14,35 +14,32 @@ import { useForm } from 'react-hook-form';
 import GlobalApi from '@/app/_services/GlobalApi';
 import { toast } from 'sonner';
 import { LoaderIcon } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 
 function AddNewStudent({refreshData}) {
     const [open, setOpen] = useState(false);
-    const [grades,setGrades]=useState([]);
-    const [loading,setLoading]=useState(false);
-    const {
-        register,
-        handleSubmit,
-        watch,
-        reset,
-        formState: { errors },
-    } = useForm()
+    const [grades, setGrades] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const { register, handleSubmit, watch, reset, formState: { errors } } = useForm();
+    const { user } = useUser();
 
-    useEffect(()=>{
+    useEffect(() => {
         GetAllGradesList();
-    },[])
+    }, []);
 
-    const GetAllGradesList=()=>{
-        GlobalApi.GetAllGrades().then(resp=>{
+    const GetAllGradesList = () => {
+        GlobalApi.GetAllGrades().then(resp => {
             setGrades(resp.data);
-            
-        })
-    }
+        });
+    };
+
     const onSubmit = async (data) => {
         setLoading(true);
         try {
             // Validate data before submission
             if (!data.name || !data.grade) {
                 toast.error('Name and grade are required');
+                setLoading(false);
                 return;
             }
 
@@ -53,13 +50,13 @@ function AddNewStudent({refreshData}) {
                 address: data.address ? data.address.trim() : null,
                 contact: data.contact ? data.contact.trim() : null,
                 email: data.email ? data.email.trim() : null,
-                
+                clerkUserId: user?.id || null,
             };
 
             console.log('Submitting student data:', studentData);
             const resp = await GlobalApi.CreateNewStudent(studentData);
             console.log("Response from create student:", resp);
-            
+
             if (resp.data) {
                 reset();
                 refreshData();
@@ -70,17 +67,16 @@ function AddNewStudent({refreshData}) {
             }
         } catch (error) {
             console.error("Error creating student:", error);
-            const errorMessage = error.response?.data?.message || 
-                               error.response?.data?.error || 
-                               error.message || 
-                               'Failed to create student';
+            const errorMessage = error.response?.data?.message ||
+                error.response?.data?.error ||
+                error.message ||
+                'Failed to create student';
             toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    
     return (
         <div>
             <Button onClick={() => setOpen(true)}>+ Add New Student</Button>

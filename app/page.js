@@ -82,7 +82,7 @@ export default function LandingPage() {
             </motion.div>
           </nav>
           <div className="flex items-center gap-4">
-           <Link href={"/attendee"} className="cursor-pointer"><p>Attendee</p></Link>
+           <Link href={"/attendee/take-attendance"} className="cursor-pointer"><p>Attendee</p></Link>
             <SignedIn>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
