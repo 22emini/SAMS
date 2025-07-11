@@ -25,7 +25,7 @@ const TakeAttendance = () => {
       const data = await res.json();
       if (data.exists) {
         // Redirect to Face ID attendance page with email and grade as query params (no lecturer email)
-        router.push(`/attendee/take-attendance/faceID?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`);
+        router.push(`/take-attendance/faceID?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`);
       } else {
         setError('No record found for this email and grade. Please request access from your clerk.');
       }

@@ -18,7 +18,6 @@ const FaceRegistration = () => {
   const [stream, setStream] = useState(null)
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
-  const lecturerEmail = searchParams.get('lecturerEmail') || ''
   const grade = searchParams.get('grade') || ''
   const [student, setStudent] = useState(null)
   const [processing, setProcessing] = useState(false)
@@ -53,36 +52,36 @@ const FaceRegistration = () => {
     // eslint-disable-next-line
   }, [])
 
-  // Find student by email, lecturerEmail, and grade
+  // Find student by email and grade, and validate clerk assignment
   useEffect(() => {
     const fetchStudent = async () => {
-      if (email && lecturerEmail && grade) {
+      if (email && grade) {
         try {
-          // Get lecturer's clerkUserId
-          const lecturerResp = await GlobalApi.VerifyLecturerEmail(lecturerEmail.trim())
-          if (!lecturerResp.data || !lecturerResp.data.clerkUserId) {
-            toast.error('Lecturer not found')
-            return
-          }
-          const clerkUserId = lecturerResp.data.clerkUserId
-          // Get student by email, lecturer and grade
-          const resp = await GlobalApi.GetStudentsByLecturerAndGrade({
-            email: email.trim(),
-            clerkUserId,
-            grade: grade.trim(),
-          })
-          if (resp.data && Array.isArray(resp.data) && resp.data.length > 0) {
-            setStudent(resp.data[0])
+          // Use the attendee/validate API to check if student exists and is assigned to a clerk
+          const res = await fetch('/api/attendee/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), grade: grade.trim() })
+          });
+          const data = await res.json();
+          console.log('DEBUG /api/attendee/validate response:', data);
+          // Validation: student must exist and be assigned to a clerk
+          if (data.exists && data.student && data.student.clerkId) {
+            setStudent(data.student);
           } else {
-            toast.error('Student not found for this lecturer and grade')
+            toast.error('Student not found for this grade or not assigned to a clerk');
+            setStudent(null);
           }
         } catch (err) {
-          toast.error('Failed to load student')
+          toast.error('Failed to load student');
+          setStudent(null);
         }
+      } else {
+        setStudent(null);
       }
-    }
-    fetchStudent()
-  }, [email, lecturerEmail, grade])
+    };
+    fetchStudent();
+  }, [email, grade]);
 
   // Draw bounding box overlay
   const drawBox = (detection) => {
@@ -207,8 +206,8 @@ const FaceRegistration = () => {
       }
       await GlobalApi.RegisterFaceId(student.id, avgDescriptor)
       toast.success('Face ID registered successfully!')
-      // Redirect back to face recognition with params
-      router.push(`/attendee/take-attendance/faceID?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)
+      // Redirect back to face recognition with params (no lecturer)
+      router.push(`/take-attendance/faceID?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)
     } catch (error) {
       toast.error('Error during face registration')
     } finally {
@@ -233,8 +232,7 @@ const FaceRegistration = () => {
               <input type="email" value={email} disabled className="w-full p-2 border rounded-md bg-gray-100" />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1">Lecturer Email</label>
-              <input type="email" value={lecturerEmail} disabled className="w-full p-2 border rounded-md bg-gray-100" />
+              {/* Lecturer Email removed */}
             </div>
             {student && (
               <div className="mt-4 p-3 bg-blue-50 rounded-md border flex flex-col gap-1">
@@ -295,7 +293,7 @@ const FaceRegistration = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push(`/attendee/take-attendance/faceID?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)}
+            onClick={() => router.push(`/take-attendance/faceID?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)}
             disabled={processing}
           >
             Cancel

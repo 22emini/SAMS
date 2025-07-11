@@ -15,7 +15,11 @@ export async function POST(req) {
     )
   );
   if (students && students.length > 0) {
-    return Response.json({ exists: true });
+    // Return the first matching student and expose clerkId for frontend
+    const studentObj = students[0];
+    // Rename clerkUserId to clerkId for frontend compatibility
+    const { clerkUserId, ...rest } = studentObj;
+    return Response.json({ exists: true, student: { ...rest, clerkId: clerkUserId } });
   } else {
     return Response.json({ exists: false });
   }

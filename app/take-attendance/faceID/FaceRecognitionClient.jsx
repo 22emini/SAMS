@@ -11,19 +11,11 @@ import moment from 'moment';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-// Student fetching logic
-const fetchStudentByEmailLecturerGrade = async (email, lecturerEmail, grade) => {
+// Student fetching logic (no lecturer email required)
+const fetchStudentByEmailAndGrade = async (email, grade) => {
   try {
-    // Get lecturer's clerkUserId
-    const lecturerResp = await GlobalApi.VerifyLecturerEmail(lecturerEmail.trim())
-    if (!lecturerResp.data || !lecturerResp.data.clerkUserId) {
-      return null
-    }
-    const clerkUserId = lecturerResp.data.clerkUserId
-    // Get student by email, lecturer and grade
-    const resp = await GlobalApi.GetStudentsByLecturerAndGrade({
+    const resp = await GlobalApi.GetStudentByEmailAndGrade({
       email: email.trim(),
-      clerkUserId,
       grade: grade.trim(),
     })
     if (resp.data && Array.isArray(resp.data) && resp.data.length > 0) {
@@ -38,6 +30,17 @@ const fetchStudentByEmailLecturerGrade = async (email, lecturerEmail, grade) => 
 const FaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState(true)
   const [stream, setStream] = useState(null)
+  // Function to stop camera stream
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx && ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  }  
   const [processing, setProcessing] = useState(false)
   const [student, setStudent] = useState(null)
   const videoRef = useRef(null)
@@ -48,19 +51,18 @@ const FaceRecognition = () => {
   const searchParams = useSearchParams()
   // Get params from URL (from Take Attendance page)
   const email = searchParams.get('email') || ''
-  const lecturerEmail = searchParams.get('lecturerEmail') || ''
   const grade = searchParams.get('grade') || ''
 
   // Fetch student info on mount
   useEffect(() => {
     const fetchStudent = async () => {
-      if (email && lecturerEmail && grade) {
-        const s = await fetchStudentByEmailLecturerGrade(email, lecturerEmail, grade)
+      if (email && grade) {
+        const s = await fetchStudentByEmailAndGrade(email, grade)
         setStudent(s)
       }
     }
     fetchStudent()
-  }, [email, lecturerEmail, grade])
+  }, [email, grade])
 
   useEffect(() => {
     let mounted = true
@@ -144,7 +146,7 @@ const FaceRecognition = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        if (cameraToastCountRef.current < 3) {
+        if (cameraToastCountRef.current < 1) {
           toast.success('Camera initialized successfully')
           cameraToastCountRef.current += 1
         }
@@ -173,7 +175,7 @@ const FaceRecognition = () => {
   const { getToken } = useAuth();
 
   const handleAttendance = async () => {
-    if (!videoRef.current || isModelLoading || !email || !lecturerEmail || !grade) {
+    if (!videoRef.current || isModelLoading || !email || !grade) {
       toast.error('Missing required information or camera not ready')
       return
     }
@@ -236,7 +238,7 @@ const FaceRecognition = () => {
       } else {
         toast.error(response.data.message || 'Face not recognized')
         if (window.confirm('Face not recognized. Would you like to register your face ID?')) {
-          router.push(`/attendee/take-attendance/faceID/register?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)
+          router.push(`/take-attendance/faceID/register?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)
         }
       }
     } catch (error) {
@@ -261,39 +263,34 @@ const FaceRecognition = () => {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Face Recognition Attendance</h1>
-      <Link href="/" className=''>
-        <Button className="w-full sm:w-auto" >
-           <ArrowLeft  className=' text-white'/>  back
-        </Button>
-      </Link>
+      <Button
+        className="w-full sm:w-auto"
+        onClick={() => {
+          stopCamera();
+          router.push("/");
+        }}
+      >
+        <ArrowLeft className='text-white' /> back
+      </Button>
       <div className="flex flex-col items-center gap-4">
-        <div className="w-full max-w-md mb-4">
-          <label className="block text-sm font-medium mb-1">Grade</label>
-          <input
-            type="text"
-            value={grade}
-            disabled
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-          />
-        </div>
-        <div className="w-full max-w-md mb-4">
-          <label className="block text-sm font-medium mb-1">Student Email</label>
-          <input
-            type="email"
-            value={email}
-            disabled
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-          />
-        </div>
-        <div className="w-full max-w-md mb-4">
-          <label className="block text-sm font-medium mb-1">Lecturer Email</label>
-          <input
-            type="email"
-            value={lecturerEmail}
-            disabled
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-          />
-        </div>
+      <div className="w-full max-w-md mb-4">
+        <label className="block text-sm font-medium mb-1">Grade</label>
+        <input
+          type="text"
+          value={grade}
+          disabled
+          className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+        />
+      </div>
+      <div className="w-full max-w-md mb-4">
+        <label className="block text-sm font-medium mb-1">Student Email</label>
+        <input
+          type="email"
+          value={email}
+          disabled
+          className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+        />
+      </div>
         {student && (
           <div className="mt-2 p-3 bg-blue-50 rounded-md border flex flex-col gap-1 w-full max-w-md">
             <span className="font-medium text-blue-700">Student:</span>
@@ -332,7 +329,7 @@ const FaceRecognition = () => {
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => router.push(`/attendee/take-attendance/faceID/register?email=${encodeURIComponent(email)}&lecturerEmail=${encodeURIComponent(lecturerEmail)}&grade=${encodeURIComponent(grade)}`)}>
+            onClick={() => router.push(`/take-attendance/faceID/register?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)}>
             Register Face ID
           </Button>
         </div>
