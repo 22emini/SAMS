@@ -1,4 +1,4 @@
-import { boolean, int, mysqlTable, varchar, text } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlTable, varchar, text, double } from "drizzle-orm/mysql-core";
 
 export const GRADES=mysqlTable('grades',{
     id:int('id',{length:11}).autoincrement().primaryKey(),
@@ -32,4 +32,13 @@ export const USERGMAIL=mysqlTable('usergmail',{
     clerkUserId: varchar('clerk_user_id', { length: 256 }) 
     
 });
+
+export const GEOFENCING = mysqlTable('geofencing', {
+  id: int('id', { length: 11 }).autoincrement().primaryKey(),
+  enabled: boolean('enabled').default(false),
+  lat: double('lat'),
+  lng: double('lng'),
+  clerkUserId: varchar('clerk_user_id', { length: 256 }) // Added for user association
+});
+
 

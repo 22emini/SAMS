@@ -7,6 +7,11 @@ import { toast } from 'sonner';
 
 const StudentList = () => {
   const [students, setStudents] = useState([]);
+  // Helper function to check if student has registered Face ID
+  const hasFaceId = (student) => {
+    // If faceDescriptor exists and is not empty/null, consider registered
+    return !!student.faceDescriptor && student.faceDescriptor.trim() !== '';
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -193,6 +198,7 @@ const StudentList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Face ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -210,6 +216,13 @@ const StudentList = () => {
                         <Mail className="w-4 h-4 mr-1" />
                         Message
                       </Button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hasFaceId(student) ? (
+                      <span className="text-green-600 font-semibold">Registered</span>
+                    ) : (
+                      <span className="text-red-600 font-semibold">Not Registered</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

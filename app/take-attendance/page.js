@@ -74,6 +74,10 @@ const TakeAttendance = () => {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Checking...' : 'Proceed'}
         </Button>
+        <Button variant="outline" className="w-full" >
+          <a href="/">Back to Home</a>
+
+        </Button>
       </form>
     </div>
   );

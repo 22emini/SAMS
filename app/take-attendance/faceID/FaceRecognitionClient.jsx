@@ -27,8 +27,29 @@ const fetchStudentByEmailAndGrade = async (email, grade) => {
   }
 }
 
+// Helper: Calculate distance between two lat/lng points (Haversine formula)
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Radius of the earth in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 const FaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState(true)
+  // Geofencing state (read-only for attendees)
+  const [geoEnabled, setGeoEnabled] = useState(false)
+  const [geoStatus, setGeoStatus] = useState('disabled') // 'disabled', 'checking', 'success', 'fail'
+  const [geoError, setGeoError] = useState('')
+  const [geoAllowed, setGeoAllowed] = useState(false)
+  const [userLocation, setUserLocation] = useState(null)
+  const [clerkLocation, setClerkLocation] = useState(null)
+  const geoCheckIntervalRef = useRef(null)
   const [stream, setStream] = useState(null)
   // Function to stop camera stream
   const stopCamera = () => {
@@ -52,6 +73,83 @@ const FaceRecognition = () => {
   // Get params from URL (from Take Attendance page)
   const email = searchParams.get('email') || ''
   const grade = searchParams.get('grade') || ''
+  // Fetch geofencing status/location from backend API and poll for changes
+  useEffect(() => {
+    let intervalId;
+    const fetchGeoStatus = async () => {
+      try {
+        const resp = await fetch('/api/geofencing');
+        const data = await resp.json();
+        setGeoEnabled(!!data.enabled);
+        setClerkLocation(data.location || null);
+      } catch {}
+    };
+    fetchGeoStatus();
+    intervalId = setInterval(fetchGeoStatus, 10000); // poll every 10s
+    window.addEventListener('focus', fetchGeoStatus);
+    document.addEventListener('visibilitychange', fetchGeoStatus);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', fetchGeoStatus);
+      document.removeEventListener('visibilitychange', fetchGeoStatus);
+    };
+  }, []);
+
+  // Remove attendee ability to set clerk location or enable geofencing
+  // Geofencing: Check location every 5 minutes if enabled
+useEffect(() => {
+  if (!geoEnabled) {
+    setGeoStatus('disabled');
+    setGeoAllowed(false);
+    setGeoError('');
+    if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
+    return;
+  }
+  if (!clerkLocation) {
+    setGeoStatus('fail');
+    setGeoError('Clerk location not set. Please set location in dashboard.');
+    setGeoAllowed(false);
+    return;
+  }
+  if (!navigator.geolocation) {
+    setGeoStatus('fail');
+    setGeoError('Geolocation not supported.');
+    setGeoAllowed(false);
+    return;
+  }
+  const checkLocation = () => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const dist = getDistanceFromLatLonInMeters(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          clerkLocation.lat,
+          clerkLocation.lng
+        );
+        if (dist <= 50) {
+          setGeoStatus('success');
+          setGeoAllowed(true);
+          setGeoError('');
+        } else {
+          setGeoStatus('fail');
+          setGeoAllowed(false);
+          setGeoError(`You are ${dist.toFixed(1)} meters away. Must be within 50 meters.`);
+        }
+      },
+      (err) => {
+        setGeoStatus('fail');
+        setGeoAllowed(false);
+        setGeoError('Unable to get location: ' + err.message);
+      }
+    );
+  };
+  checkLocation();
+  geoCheckIntervalRef.current = setInterval(checkLocation, 5 * 60 * 1000);
+  return () => {
+    if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
+  };
+}, [geoEnabled, clerkLocation]);
 
   // Fetch student info on mount
   useEffect(() => {
@@ -146,7 +244,7 @@ const FaceRecognition = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        if (cameraToastCountRef.current < 1) {
+        if (cameraToastCountRef.current < 0) {
           toast.success('Camera initialized successfully')
           cameraToastCountRef.current += 1
         }
@@ -176,76 +274,74 @@ const FaceRecognition = () => {
 
   const handleAttendance = async () => {
     if (!videoRef.current || isModelLoading || !email || !grade) {
-      toast.error('Missing required information or camera not ready')
-      return
+      toast.error('Missing required information or camera not ready');
+      return;
     }
-    setProcessing(true)
+    if (geoEnabled && !geoAllowed) {
+      toast.error('Geofencing: You are not within the required range to mark attendance.');
+      return;
+    }
+    setProcessing(true);
     if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d')
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
     try {
-      // Ensure video is playing and ready
-      if (videoRef.current.readyState !== 4) {
-        await new Promise((resolve) => {
-          videoRef.current.onloadeddata = () => resolve()
-        })
+      // Ensure video is ready
+      if (videoRef.current.readyState < 2) {
+        await new Promise(resolve => {
+          videoRef.current.onloadeddata = () => resolve();
+        });
       }
-      // Capture multiple frames and average descriptors
-      const descriptors = []
-      let attempts = 0
-      let detections = null
-      const maxAttempts = 7
-      const framesToCapture = 5
-      while (attempts < maxAttempts && descriptors.length < framesToCapture) {
-        detections = await faceapi.detectSingleFace(
-          videoRef.current,
-          new faceapi.SsdMobilenetv1Options({
-            minConfidence: 0.4
-          })
-        ).withFaceLandmarks('net').withFaceDescriptor()
-        if (detections && detections.descriptor) {
-          drawDetections(detections)
-          descriptors.push(detections.descriptor)
-        }
-        attempts++
-        await new Promise(res => setTimeout(res, 300))
+      // Try multiple times for face detection
+      let detection = null;
+      let attempts = 0;
+      while (!detection && attempts < 5) {
+        detection = await faceapi.detectSingleFace(videoRef.current).withFaceLandmarks().withFaceDescriptor();
+        attempts++;
+        if (!detection) await new Promise(res => setTimeout(res, 300));
       }
-      if (descriptors.length === 0) {
-        toast.error('No face detected after several attempts. Please ensure your face is clearly visible')
-        return
+      if (!detection) {
+        toast.error('No face detected. Please ensure your face is visible to the camera.');
+        setProcessing(false);
+        return;
       }
-      // Average descriptors
-      const avgDescriptor = descriptors[0].map((_, i) =>
-        descriptors.reduce((sum, desc) => sum + desc[i], 0) / descriptors.length
-      )
-      // Try to match face and mark attendance (no authentication)
-      const response = await GlobalApi.MarkAttendanceWithFace(
-        Array.from(avgDescriptor),
-        grade
-      )
-      if (response.data.matched && response.data.student) {
-        // Mark attendance (remove authorization for this request)
-        const today = new Date()
-        await GlobalApi.MarkAttendance({
-          studentId: response.data.student.id,
-          present: true,
-          day: today.getDate(),
-          date: moment(today).format('MM/YYYY'),
-          noAuth: true // <-- add this flag to signal no auth required
-        })
-        toast.success(`Attendance marked for ${response.data.student.name}`)
+      drawDetections(detection);
+      // Send descriptor to backend for verification and attendance
+      const descriptor = Array.from(detection.descriptor);
+      const payload = {
+        email,
+        grade,
+        descriptor,
+        timestamp: moment().toISOString(),
+        location: userLocation || null
+      };
+      const token = getToken ? await getToken() : null;
+      let resp, result;
+      try {
+        resp = await fetch('/api/face-attendance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+        result = await resp.json();
+      } catch (err) {
+        toast.error('Network error. Please try again.');
+        setProcessing(false);
+        return;
+      }
+      if (resp.ok && result.success) {
+        toast.success('Attendance marked successfully!');
       } else {
-        toast.error(response.data.message || 'Face not recognized')
-        if (window.confirm('Face not recognized. Would you like to register your face ID?')) {
-          router.push(`/take-attendance/faceID/register?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)
-        }
+        toast.error(result?.message || 'Face not recognized. Attendance not marked.');
       }
     } catch (error) {
-      console.error('Error processing face:', error)
-      toast.error('Error processing face recognition')
+      toast.error('Error marking attendance: ' + error.message);
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
   }
 
@@ -273,24 +369,42 @@ const FaceRecognition = () => {
         <ArrowLeft className='text-white' /> back
       </Button>
       <div className="flex flex-col items-center gap-4">
-      <div className="w-full max-w-md mb-4">
-        <label className="block text-sm font-medium mb-1">Grade</label>
-        <input
-          type="text"
-          value={grade}
-          disabled
-          className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-        />
-      </div>
-      <div className="w-full max-w-md mb-4">
-        <label className="block text-sm font-medium mb-1">Student Email</label>
-        <input
-          type="email"
-          value={email}
-          disabled
-          className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-        />
-      </div>
+        {/* Geofencing status (read-only for attendees) */}
+        <div className="w-full max-w-md mb-4 flex items-center gap-2">
+          <label className="block text-sm font-medium">Geofencing (50m radius)</label>
+          <span className={`ml-2 px-2 py-1 rounded ${geoEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{geoEnabled ? 'Enabled' : 'Disabled'}</span>
+        </div>
+        {geoEnabled && (
+          <div className="w-full max-w-md mb-2">
+            <div className={`p-2 rounded ${geoStatus === 'success' ? 'bg-green-50' : geoStatus === 'fail' ? 'bg-red-50' : 'bg-yellow-50'}`}>
+              <span className="font-medium">Geofencing Status: </span>
+              {geoStatus === 'checking' && 'Checking location...'}
+              {geoStatus === 'success' && 'Within range!'}
+              {geoStatus === 'fail' && geoError}
+            </div>
+            {userLocation && clerkLocation && (
+              <div className="text-xs text-gray-500 mt-1">Your location: {userLocation.lat?.toFixed(5)}, {userLocation.lng?.toFixed(5)}<br/>Clerk location: {clerkLocation.lat?.toFixed(5)}, {clerkLocation.lng?.toFixed(5)}</div>
+            )}
+          </div>
+        )}
+        <div className="w-full max-w-md mb-4">
+          <label className="block text-sm font-medium mb-1">Grade</label>
+          <input
+            type="text"
+            value={grade}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+          />
+        </div>
+        <div className="w-full max-w-md mb-4">
+          <label className="block text-sm font-medium mb-1">Student Email</label>
+          <input
+            type="email"
+            value={email}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
+          />
+        </div>
         {student && (
           <div className="mt-2 p-3 bg-blue-50 rounded-md border flex flex-col gap-1 w-full max-w-md">
             <span className="font-medium text-blue-700">Student:</span>
@@ -318,7 +432,7 @@ const FaceRecognition = () => {
         <div className="flex gap-4">
           <Button 
             onClick={handleAttendance}
-            disabled={processing}
+            disabled={processing || (geoEnabled && !geoAllowed)}
             className="flex items-center gap-2">
             {processing ? (
               <>
