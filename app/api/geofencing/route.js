@@ -49,3 +49,24 @@ export async function POST(req) {
   const { enabled: updEnabled, lat: updLat, lng: updLng } = updated[0] || {};
   return NextResponse.json({ success: true, enabled: updEnabled, location: updLat && updLng ? { lat: updLat, lng: updLng } : null });
 }
+
+export async function DELETE(req) {
+  // Accept clerkUserId from body or query string
+  let clerkUserId;
+  if (req.method === 'DELETE') {
+    try {
+      const body = await req.json();
+      clerkUserId = body.clerkUserId;
+    } catch {
+      // fallback to query param if no body
+      const { searchParams } = new URL(req.url);
+      clerkUserId = searchParams.get('clerkUserId');
+    }
+  }
+  if (!clerkUserId) {
+    return NextResponse.json({ error: 'Missing clerkUserId' }, { status: 400 });
+  }
+  // Delete geofencing record for user
+  await db.delete(GEOFENCING).where(eq(GEOFENCING.clerkUserId, clerkUserId));
+  return NextResponse.json({ success: true });
+}

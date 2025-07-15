@@ -60,11 +60,19 @@ function Dashboard() {
         setLocationError('');
       }
       if (user && user.id) {
-        await fetch('/api/geofencing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clerkUserId: user.id, enabled: faceSessionEnabled, location })
-        });
+        if (faceSessionEnabled) {
+          await fetch('/api/geofencing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clerkUserId: user.id, enabled: faceSessionEnabled, location })
+          });
+        } else {
+          await fetch('/api/geofencing', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clerkUserId: user.id })
+          });
+        }
       }
     };
     updateGeofencingStatus();

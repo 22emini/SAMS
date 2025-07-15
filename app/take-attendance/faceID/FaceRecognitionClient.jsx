@@ -42,6 +42,8 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 
 const FaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState(true)
+  const [stream, setStream] = useState(null)
+  
   // Geofencing state (read-only for attendees)
   const [geoEnabled, setGeoEnabled] = useState(false)
   const [geoStatus, setGeoStatus] = useState('disabled') // 'disabled', 'checking', 'success', 'fail'
@@ -50,7 +52,7 @@ const FaceRecognition = () => {
   const [userLocation, setUserLocation] = useState(null)
   const [clerkLocation, setClerkLocation] = useState(null)
   const geoCheckIntervalRef = useRef(null)
-  const [stream, setStream] = useState(null)
+  
   // Function to stop camera stream
   const stopCamera = () => {
     if (stream) {
@@ -73,6 +75,7 @@ const FaceRecognition = () => {
   // Get params from URL (from Take Attendance page)
   const email = searchParams.get('email') || ''
   const grade = searchParams.get('grade') || ''
+
   // Fetch geofencing status/location from backend API and poll for changes
   useEffect(() => {
     let intervalId;
@@ -95,61 +98,60 @@ const FaceRecognition = () => {
     };
   }, []);
 
-  // Remove attendee ability to set clerk location or enable geofencing
   // Geofencing: Check location every 5 minutes if enabled
-useEffect(() => {
-  if (!geoEnabled) {
-    setGeoStatus('disabled');
-    setGeoAllowed(false);
-    setGeoError('');
-    if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
-    return;
-  }
-  if (!clerkLocation) {
-    setGeoStatus('fail');
-    setGeoError('Clerk location not set. Please set location in dashboard.');
-    setGeoAllowed(false);
-    return;
-  }
-  if (!navigator.geolocation) {
-    setGeoStatus('fail');
-    setGeoError('Geolocation not supported.');
-    setGeoAllowed(false);
-    return;
-  }
-  const checkLocation = () => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        const dist = getDistanceFromLatLonInMeters(
-          pos.coords.latitude,
-          pos.coords.longitude,
-          clerkLocation.lat,
-          clerkLocation.lng
-        );
-        if (dist <= 50) {
-          setGeoStatus('success');
-          setGeoAllowed(true);
-          setGeoError('');
-        } else {
+  useEffect(() => {
+    if (!geoEnabled) {
+      setGeoStatus('disabled');
+      setGeoAllowed(false);
+      setGeoError('');
+      if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
+      return;
+    }
+    if (!clerkLocation) {
+      setGeoStatus('fail');
+      setGeoError('Clerk location not set. Please set location in dashboard.');
+      setGeoAllowed(false);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setGeoStatus('fail');
+      setGeoError('Geolocation not supported.');
+      setGeoAllowed(false);
+      return;
+    }
+    const checkLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const dist = getDistanceFromLatLonInMeters(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            clerkLocation.lat,
+            clerkLocation.lng
+          );
+          if (dist <= 50) {
+            setGeoStatus('success');
+            setGeoAllowed(true);
+            setGeoError('');
+          } else {
+            setGeoStatus('fail');
+            setGeoAllowed(false);
+            setGeoError(`You are ${dist.toFixed(1)} meters away. Must be within 50 meters.`);
+          }
+        },
+        (err) => {
           setGeoStatus('fail');
           setGeoAllowed(false);
-          setGeoError(`You are ${dist.toFixed(1)} meters away. Must be within 50 meters.`);
+          setGeoError('Unable to get location: ' + err.message);
         }
-      },
-      (err) => {
-        setGeoStatus('fail');
-        setGeoAllowed(false);
-        setGeoError('Unable to get location: ' + err.message);
-      }
-    );
-  };
-  checkLocation();
-  geoCheckIntervalRef.current = setInterval(checkLocation, 5 * 60 * 1000);
-  return () => {
-    if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
-  };
-}, [geoEnabled, clerkLocation]);
+      );
+    };
+    checkLocation();
+    geoCheckIntervalRef.current = setInterval(checkLocation, 5 * 60 * 1000);
+    return () => {
+      if (geoCheckIntervalRef.current) clearInterval(geoCheckIntervalRef.current);
+    };
+  }, [geoEnabled, clerkLocation]);
 
   // Fetch student info on mount
   useEffect(() => {
@@ -192,6 +194,9 @@ useEffect(() => {
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d')
         ctx && ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+      }
+      if (geoCheckIntervalRef.current) {
+        clearInterval(geoCheckIntervalRef.current)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,7 +249,7 @@ useEffect(() => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        if (cameraToastCountRef.current < 0) {
+        if (cameraToastCountRef.current < 1) {
           toast.success('Camera initialized successfully')
           cameraToastCountRef.current += 1
         }
@@ -274,74 +279,89 @@ useEffect(() => {
 
   const handleAttendance = async () => {
     if (!videoRef.current || isModelLoading || !email || !grade) {
-      toast.error('Missing required information or camera not ready');
-      return;
+      toast.error('Missing required information or camera not ready')
+      return
     }
+    
+    // Check geofencing before proceeding
     if (geoEnabled && !geoAllowed) {
-      toast.error('Geofencing: You are not within the required range to mark attendance.');
-      return;
+      toast.error('Geofencing: You are not within the required range to mark attendance.')
+      return
     }
-    setProcessing(true);
+    
+    setProcessing(true)
     if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const ctx = canvasRef.current.getContext('2d')
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
     }
     try {
-      // Ensure video is ready
-      if (videoRef.current.readyState < 2) {
-        await new Promise(resolve => {
-          videoRef.current.onloadeddata = () => resolve();
-        });
+      // Ensure video is playing and ready
+      if (videoRef.current.readyState !== 4) {
+        await new Promise((resolve) => {
+          videoRef.current.onloadeddata = () => resolve()
+        })
       }
-      // Try multiple times for face detection
-      let detection = null;
-      let attempts = 0;
-      while (!detection && attempts < 5) {
-        detection = await faceapi.detectSingleFace(videoRef.current).withFaceLandmarks().withFaceDescriptor();
-        attempts++;
-        if (!detection) await new Promise(res => setTimeout(res, 300));
+      // Capture multiple frames and average descriptors
+      const descriptors = []
+      let attempts = 0
+      let detections = null
+      const maxAttempts = 7
+      const framesToCapture = 5
+      while (attempts < maxAttempts && descriptors.length < framesToCapture) {
+        detections = await faceapi.detectSingleFace(
+          videoRef.current,
+          new faceapi.SsdMobilenetv1Options({
+            minConfidence: 0.4
+          })
+        ).withFaceLandmarks('net').withFaceDescriptor()
+        if (detections && detections.descriptor) {
+          drawDetections(detections)
+          descriptors.push(detections.descriptor)
+        }
+        attempts++
+        await new Promise(res => setTimeout(res, 300))
       }
-      if (!detection) {
-        toast.error('No face detected. Please ensure your face is visible to the camera.');
-        setProcessing(false);
-        return;
+      if (descriptors.length === 0) {
+        toast.error('No face detected after several attempts. Please ensure your face is clearly visible')
+        return
       }
-      drawDetections(detection);
-      // Send descriptor to backend for verification and attendance
-      const descriptor = Array.from(detection.descriptor);
-      const payload = {
-        email,
-        grade,
-        descriptor,
-        timestamp: moment().toISOString(),
-        location: userLocation || null
-      };
-      const token = getToken ? await getToken() : null;
-      let resp, result;
-      try {
-        resp = await fetch('/api/face-attendance', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(payload)
-        });
-        result = await resp.json();
-      } catch (err) {
-        toast.error('Network error. Please try again.');
-        setProcessing(false);
-        return;
-      }
-      if (resp.ok && result.success) {
-        toast.success('Attendance marked successfully!');
+      // Average descriptors
+      const avgDescriptor = descriptors[0].map((_, i) =>
+        descriptors.reduce((sum, desc) => sum + desc[i], 0) / descriptors.length
+      )
+      
+      // Try to match face and mark attendance (no authentication)
+      const response = await GlobalApi.MarkAttendanceWithFace(
+        Array.from(avgDescriptor),
+        grade
+      )
+      if (response.data.matched && response.data.student) {
+        // Mark attendance with location data if available
+        const today = new Date()
+        const attendanceData = {
+          studentId: response.data.student.id,
+          present: true,
+          day: today.getDate(),
+          date: moment(today).format('MM/YYYY'),
+          noAuth: true, // <-- add this flag to signal no auth required
+          location: userLocation || null, // Include location data
+          timestamp: moment().toISOString()
+        }
+        
+        await GlobalApi.MarkAttendance(attendanceData)
+        
+        toast.success(`Attendance marked for ${response.data.student.name}`)
       } else {
-        toast.error(result?.message || 'Face not recognized. Attendance not marked.');
+        toast.error(response.data.message || 'Face not recognized')
+        if (window.confirm('Face not recognized. Would you like to register your face ID?')) {
+          router.push(`/take-attendance/faceID/register?email=${encodeURIComponent(email)}&grade=${encodeURIComponent(grade)}`)
+        }
       }
     } catch (error) {
-      toast.error('Error marking attendance: ' + error.message);
+      console.error('Error processing face:', error)
+      toast.error('Error processing face recognition')
     } finally {
-      setProcessing(false);
+      setProcessing(false)
     }
   }
 
@@ -372,7 +392,9 @@ useEffect(() => {
         {/* Geofencing status (read-only for attendees) */}
         <div className="w-full max-w-md mb-4 flex items-center gap-2">
           <label className="block text-sm font-medium">Geofencing (50m radius)</label>
-          <span className={`ml-2 px-2 py-1 rounded ${geoEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{geoEnabled ? 'Enabled' : 'Disabled'}</span>
+          <span className={`ml-2 px-2 py-1 rounded ${geoEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {geoEnabled ? 'Enabled' : 'Disabled'}
+          </span>
         </div>
         {geoEnabled && (
           <div className="w-full max-w-md mb-2">
@@ -383,7 +405,10 @@ useEffect(() => {
               {geoStatus === 'fail' && geoError}
             </div>
             {userLocation && clerkLocation && (
-              <div className="text-xs text-gray-500 mt-1">Your location: {userLocation.lat?.toFixed(5)}, {userLocation.lng?.toFixed(5)}<br/>Clerk location: {clerkLocation.lat?.toFixed(5)}, {clerkLocation.lng?.toFixed(5)}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Your location: {userLocation.lat?.toFixed(5)}, {userLocation.lng?.toFixed(5)}<br/>
+                Clerk location: {clerkLocation.lat?.toFixed(5)}, {clerkLocation.lng?.toFixed(5)}
+              </div>
             )}
           </div>
         )}
@@ -452,4 +477,4 @@ useEffect(() => {
   )
 }
 
-export default FaceRecognition; 
+export default FaceRecognition;
